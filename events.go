@@ -20,6 +20,5 @@ func (e *Events) Release() []Event {
 
 	events := e.queue
 	e.queue = nil
-
 	return events
 }
