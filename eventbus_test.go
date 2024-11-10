@@ -89,11 +89,15 @@ func TestFlush(t *testing.T) {
 func TestAsyncPublish(t *testing.T) {
 	bus := eventbus.New()
 	ctx := context.Background()
+	wg := &sync.WaitGroup{}
+
+	wg.Add(1)
 
 	// Создаем обработчик
 	var calls []any
 	handler := &testHandler{
 		handler: func(ctx context.Context, payload any) {
+			defer wg.Done()
 			calls = append(calls, payload)
 		},
 	}
@@ -106,9 +110,8 @@ func TestAsyncPublish(t *testing.T) {
 	bus.Publish(ctx, eventbus.NewEvent(eventType, "async payload", eventbus.WithIsAsync(true)))
 
 	// Даем время для обработки
-	for len(calls) == 0 {
-		// Ждем немного, чтобы асинхронное событие было обработано
-	}
+	// Ждем немного, чтобы асинхронное событие было обработано
+	wg.Wait()
 
 	// Проверяем, что событие было обработано
 	assert.Len(t, calls, 1)
