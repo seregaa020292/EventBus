@@ -18,11 +18,11 @@ type (
 
 type EventBus struct {
 	handlers map[EventType]Handlers
-	nextID   uint16
+	nextID   HandlerID
 	mu       sync.RWMutex
 }
 
-func NewEventBus() *EventBus {
+func New() *EventBus {
 	return &EventBus{
 		handlers: make(map[EventType]Handlers),
 		nextID:   1,

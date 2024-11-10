@@ -17,7 +17,7 @@ func (h ListenHandle1) Handle(ctx context.Context, payload any) {
 }
 
 func main() {
-	bus := eventbus.NewEventBus()
+	bus := eventbus.New()
 
 	listenHandle1 := ListenHandle1{1}
 	listenHandle2 := ListenHandle1{2}
