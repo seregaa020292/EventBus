@@ -17,6 +17,12 @@ func (h HandlerFunc) Handle(ctx context.Context, event Event) {
 	h(ctx, event)
 }
 
+func WithHandlerIsAsync(s bool) HandlerOption {
+	return func(o *handlerOption) {
+		o.isAsync = s
+	}
+}
+
 type handlerOption struct {
 	isAsync bool
 	next    Handler
@@ -31,10 +37,4 @@ func newHandlerOption(next Handler) *handlerOption {
 
 func (o handlerOption) Handle(ctx context.Context, event Event) {
 	o.next.Handle(ctx, event)
-}
-
-func WithHandlerIsAsync(s bool) HandlerOption {
-	return func(o *handlerOption) {
-		o.isAsync = s
-	}
 }
