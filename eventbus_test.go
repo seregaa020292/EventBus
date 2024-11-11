@@ -11,9 +11,8 @@ import (
 )
 
 type testHandler struct {
-	mu      sync.Mutex
-	calls   []eventbus.Event
-	handler func(ctx context.Context, event eventbus.Event)
+	calls []eventbus.Event
+	mu    sync.Mutex
 }
 
 func (h *testHandler) Handle(ctx context.Context, event eventbus.Event) {
@@ -21,32 +20,18 @@ func (h *testHandler) Handle(ctx context.Context, event eventbus.Event) {
 	defer h.mu.Unlock()
 
 	h.calls = append(h.calls, event)
-	if h.handler != nil {
-		h.handler(ctx, event)
-	}
 }
 
 type testEvent string
 
 func (e testEvent) Name() eventbus.EventName { return 1 }
-func (e testEvent) IsAsync() bool            { return false }
-
-type testEventAsync string
-
-func (e testEventAsync) Name() eventbus.EventName { return 1 }
-func (e testEventAsync) IsAsync() bool            { return true }
 
 func TestEventBus(t *testing.T) {
 	bus := eventbus.New()
 	ctx := context.Background()
 
 	// Создаем обработчик
-	var calls []eventbus.Event
-	handler := &testHandler{
-		handler: func(ctx context.Context, event eventbus.Event) {
-			calls = append(calls, event)
-		},
-	}
+	handler := &testHandler{}
 
 	// Подписываемся на событие
 	event := testEvent("test payload")
@@ -56,15 +41,15 @@ func TestEventBus(t *testing.T) {
 	bus.Publish(ctx, event)
 
 	// Убедимся, что обработчик был вызван
-	assert.Len(t, calls, 1)
-	assert.Equal(t, testEvent("test payload"), calls[0])
+	assert.Len(t, handler.calls, 1)
+	assert.Equal(t, testEvent("test payload"), handler.calls[0])
 
 	// Отписываемся и проверяем, что обработчик больше не вызывается
 	unsubscribe()
 	bus.Publish(ctx, testEvent("another payload"))
 
 	// Убедимся, что обработчик не был вызван
-	assert.Len(t, calls, 1)
+	assert.Len(t, handler.calls, 1)
 }
 
 func TestFlush(t *testing.T) {
@@ -73,50 +58,49 @@ func TestFlush(t *testing.T) {
 	events := &eventbus.Events{}
 
 	// Создаем обработчик
-	var calls []any
-	handler := &testHandler{
-		handler: func(ctx context.Context, event eventbus.Event) {
-			calls = append(calls, event)
-		},
-	}
+	handler := &testHandler{}
+
+	event := testEvent("test payload")
 
 	// Подписываемся на событие
-	bus.Subscribe(eventbus.EventName(1), handler)
+	bus.Subscribe(event.Name(), handler)
 
 	// Добавляем события в очередь
-	events.Enqueue(testEvent("flush payload 1"))
-	events.Enqueue(testEvent("flush payload 2"))
+	events.Enqueue(event)
+	events.Enqueue(event)
 
 	// Вызываем Flush
 	bus.Flush(ctx, events)
 
 	// Проверяем, что оба события были обработаны
-	assert.Len(t, calls, 2)
-	assert.Equal(t, testEvent("flush payload 1"), calls[0])
-	assert.Equal(t, testEvent("flush payload 2"), calls[1])
+	assert.Len(t, handler.calls, 2)
+	assert.Equal(t, testEvent("test payload"), handler.calls[0])
+	assert.Equal(t, testEvent("test payload"), handler.calls[1])
 }
 
 func TestAsyncPublish(t *testing.T) {
 	bus := eventbus.New()
 	ctx := context.Background()
-	wg := &sync.WaitGroup{}
-
-	wg.Add(1)
 
 	// Создаем обработчик
 	var calls []any
-	handler := &testHandler{
-		handler: func(ctx context.Context, event eventbus.Event) {
-			defer wg.Done()
-			calls = append(calls, event)
-		},
-	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	handler := eventbus.HandlerFunc(func(ctx context.Context, event eventbus.Event) {
+		defer wg.Done()
+
+		calls = append(calls, event)
+	})
+
+	event := testEvent("async payload")
 
 	// Подписываемся на событие
-	bus.Subscribe(eventbus.EventName(1), handler)
+	bus.Subscribe(event.Name(), handler, eventbus.WithHandlerIsAsync(true))
 
 	// Публикуем асинхронное событие
-	bus.Publish(ctx, testEventAsync("async payload"))
+	bus.Publish(ctx, event)
 
 	// Даем время для обработки
 	// Ждем немного, чтобы асинхронное событие было обработано
@@ -124,7 +108,7 @@ func TestAsyncPublish(t *testing.T) {
 
 	// Проверяем, что событие было обработано
 	assert.Len(t, calls, 1)
-	assert.Equal(t, testEventAsync("async payload"), calls[0])
+	assert.Equal(t, testEvent("async payload"), calls[0])
 }
 
 func TestUnsubscribe(t *testing.T) {
@@ -132,30 +116,27 @@ func TestUnsubscribe(t *testing.T) {
 	ctx := context.Background()
 
 	// Создаем обработчик
-	var calls []any
-	handler := &testHandler{
-		handler: func(ctx context.Context, event eventbus.Event) {
-			calls = append(calls, event)
-		},
-	}
+	handler := &testHandler{}
+
+	event := testEvent("payload unsubscribe")
 
 	// Подписываемся на событие
-	handlerID, unsubscribe := bus.Subscribe(eventbus.EventName(1), handler)
+	handlerID, unsubscribe := bus.Subscribe(event.Name(), handler)
 
 	assert.Equal(t, uint16(1), handlerID)
 
 	// Публикуем событие
-	bus.Publish(ctx, testEvent("payload before unsubscribe"))
+	bus.Publish(ctx, event)
 
 	// Убедимся, что обработчик был вызван
-	assert.Len(t, calls, 1)
+	assert.Len(t, handler.calls, 1)
 
 	// Отписываемся
 	unsubscribe()
 
 	// Публикуем еще одно событие
-	bus.Publish(ctx, testEvent("payload after unsubscribe"))
+	bus.Publish(ctx, event)
 
 	// Убедимся, что обработчик не был вызван
-	assert.Len(t, calls, 1)
+	assert.Len(t, handler.calls, 1)
 }

@@ -40,7 +40,7 @@ func main() {
 			fmt.Printf("eventbus handler2 event: %+v, %v\n", e, e.ID)
 		}
 	})
-	bus.Subscribe(EventTypeCreated, handler2)
+	bus.Subscribe(EventTypeCreated, handler2, eventbus.WithHandlerIsAsync(true))
 	bus.Subscribe(EventTypeUpdated, handler2)
 
 	bus.Publish(context.Background(), eventCreated{"Foo eventCreated"})

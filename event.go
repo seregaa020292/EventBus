@@ -6,7 +6,6 @@ type EventName uint16
 
 type Event interface {
 	Name() EventName
-	IsAsync() bool
 }
 
 type Events struct {

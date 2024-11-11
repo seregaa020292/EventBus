@@ -11,7 +11,7 @@ type (
 		Flush(ctx context.Context, events *Events)
 	}
 	Subscriber interface {
-		Subscribe(name EventName, handler Handler) (HandlerID, func())
+		Subscribe(name EventName, handler Handler, options ...HandlerOption) (HandlerID, func())
 		Unsubscribe(name EventName, id HandlerID)
 	}
 )
@@ -29,9 +29,14 @@ func New() *EventBus {
 	}
 }
 
-func (e *EventBus) Subscribe(name EventName, handler Handler) (HandlerID, func()) {
+func (e *EventBus) Subscribe(name EventName, handler Handler, options ...HandlerOption) (HandlerID, func()) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+
+	withHandlerOption := newHandlerOption(handler)
+	for _, option := range options {
+		option(withHandlerOption)
+	}
 
 	handlerID := e.nextID
 	e.nextID++
@@ -39,7 +44,7 @@ func (e *EventBus) Subscribe(name EventName, handler Handler) (HandlerID, func()
 	if e.handlers[name] == nil {
 		e.handlers[name] = make(Handlers)
 	}
-	e.handlers[name][handlerID] = handler
+	e.handlers[name][handlerID] = withHandlerOption
 
 	return handlerID, func() {
 		e.Unsubscribe(name, handlerID)
@@ -78,10 +83,11 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	}
 
 	for _, handler := range handlers {
-		if event.IsAsync() {
-			go handler.Handle(ctx, event)
+		h := handler.(*handlerOption)
+		if h.isAsync {
+			go h.Handle(ctx, event)
 		} else {
-			handler.Handle(ctx, event)
+			h.Handle(ctx, event)
 		}
 	}
 }
