@@ -4,7 +4,7 @@
 package main
 
 const (
-	EventTypeCreated eventbus.EventType = iota
+	EventTypeCreated eventbus.EventName = iota
 	EventTypeUpdated
 )
 
