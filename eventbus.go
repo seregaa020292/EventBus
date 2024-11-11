@@ -41,11 +41,9 @@ func (e *EventBus) Subscribe(name EventName, handler Handler) (HandlerID, func()
 	}
 	e.handlers[name][handlerID] = handler
 
-	unsubscribe := func() {
+	return handlerID, func() {
 		e.Unsubscribe(name, handlerID)
 	}
-
-	return handlerID, unsubscribe
 }
 
 func (e *EventBus) Unsubscribe(name EventName, id HandlerID) {
@@ -79,16 +77,11 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 		return
 	}
 
-	if event.IsAsync() {
-		go e.publish(ctx, handlers, event)
-		return
-	}
-
-	e.publish(ctx, handlers, event)
-}
-
-func (e *EventBus) publish(ctx context.Context, handlers Handlers, event Event) {
 	for _, handler := range handlers {
-		handler.Handle(ctx, event)
+		if event.IsAsync() {
+			go handler.Handle(ctx, event)
+		} else {
+			handler.Handle(ctx, event)
+		}
 	}
 }

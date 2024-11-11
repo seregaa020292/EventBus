@@ -19,6 +19,7 @@ type testHandler struct {
 func (h *testHandler) Handle(ctx context.Context, event eventbus.Event) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+
 	h.calls = append(h.calls, event)
 	if h.handler != nil {
 		h.handler(ctx, event)
