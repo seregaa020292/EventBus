@@ -11,48 +11,48 @@ type (
 		Flush(ctx context.Context, events *Events)
 	}
 	Subscriber interface {
-		Subscribe(typ EventType, handler Handler) (HandlerID, func())
-		Unsubscribe(typ EventType, id HandlerID)
+		Subscribe(name EventName, handler Handler) (HandlerID, func())
+		Unsubscribe(name EventName, id HandlerID)
 	}
 )
 
 type EventBus struct {
-	handlers map[EventType]Handlers
+	handlers map[EventName]Handlers
 	nextID   HandlerID
 	mu       sync.RWMutex
 }
 
 func New() *EventBus {
 	return &EventBus{
-		handlers: make(map[EventType]Handlers),
+		handlers: make(map[EventName]Handlers),
 		nextID:   1,
 	}
 }
 
-func (e *EventBus) Subscribe(typ EventType, handler Handler) (HandlerID, func()) {
+func (e *EventBus) Subscribe(name EventName, handler Handler) (HandlerID, func()) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
 	handlerID := e.nextID
 	e.nextID++
 
-	if e.handlers[typ] == nil {
-		e.handlers[typ] = make(Handlers)
+	if e.handlers[name] == nil {
+		e.handlers[name] = make(Handlers)
 	}
-	e.handlers[typ][handlerID] = handler
+	e.handlers[name][handlerID] = handler
 
 	unsubscribe := func() {
-		e.Unsubscribe(typ, handlerID)
+		e.Unsubscribe(name, handlerID)
 	}
 
 	return handlerID, unsubscribe
 }
 
-func (e *EventBus) Unsubscribe(typ EventType, id HandlerID) {
+func (e *EventBus) Unsubscribe(name EventName, id HandlerID) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	handlers, ok := e.handlers[typ]
+	handlers, ok := e.handlers[name]
 	if !ok {
 		return
 	}
@@ -60,7 +60,7 @@ func (e *EventBus) Unsubscribe(typ EventType, id HandlerID) {
 	delete(handlers, id)
 
 	if len(handlers) == 0 {
-		delete(e.handlers, typ)
+		delete(e.handlers, name)
 	}
 }
 
@@ -74,21 +74,21 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 
-	handlers, ok := e.handlers[event.typ]
+	handlers, ok := e.handlers[event.Name()]
 	if !ok {
 		return
 	}
 
-	if event.isAsync {
-		go e.publish(ctx, handlers, event.payload)
+	if event.IsAsync() {
+		go e.publish(ctx, handlers, event)
 		return
 	}
 
-	e.publish(ctx, handlers, event.payload)
+	e.publish(ctx, handlers, event)
 }
 
-func (e *EventBus) publish(ctx context.Context, handlers Handlers, payload any) {
+func (e *EventBus) publish(ctx context.Context, handlers Handlers, event Event) {
 	for _, handler := range handlers {
-		handler.Handle(ctx, payload)
+		handler.Handle(ctx, event)
 	}
 }

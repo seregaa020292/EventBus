@@ -1,30 +1,31 @@
 package eventbus
 
-type EventType uint16
-type EventOption func(*Event)
+import "sync"
 
-type Event struct {
-	typ     EventType
-	payload any
-	isAsync bool
+type EventName uint16
+
+type Event interface {
+	Name() EventName
+	IsAsync() bool
 }
 
-func NewEvent(typ EventType, payload any, options ...EventOption) Event {
-	e := Event{
-		typ:     typ,
-		payload: payload,
-		isAsync: false,
-	}
-
-	for _, option := range options {
-		option(&e)
-	}
-
-	return e
+type Events struct {
+	queue []Event
+	mu    sync.Mutex
 }
 
-func WithIsAsync(state bool) EventOption {
-	return func(e *Event) {
-		e.isAsync = state
-	}
+func (e *Events) Enqueue(event Event) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	e.queue = append(e.queue, event)
+}
+
+func (e *Events) Release() []Event {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	events := e.queue
+	e.queue = nil
+	return events
 }

@@ -12,8 +12,9 @@ type ListenHandle1 struct {
 	V int
 }
 
-func (h ListenHandle1) Handle(ctx context.Context, payload any) {
-	fmt.Printf("eventbus handler1 event: %+v, %d\n", payload, h.V)
+func (h ListenHandle1) Handle(ctx context.Context, event eventbus.Event) {
+	fmt.Printf("eventbus handler1 event: %+v, %d\n", event, h.V)
+	//fmt.Printf("eventbus handler1 event: %+v\n", event.(eventCreated))
 }
 
 func main() {
@@ -31,8 +32,8 @@ func main() {
 		bus.Unsubscribe(EventTypeCreated, handlerID)
 	}
 
-	handler2 := eventbus.HandlerFunc(func(ctx context.Context, payload any) {
-		switch e := payload.(type) {
+	handler2 := eventbus.HandlerFunc(func(ctx context.Context, event eventbus.Event) {
+		switch e := event.(type) {
 		case eventCreated:
 			fmt.Printf("eventbus handler2 event: %+v, %v\n", e, e.ID)
 		case eventUpdated:
@@ -42,23 +43,16 @@ func main() {
 	bus.Subscribe(EventTypeCreated, handler2)
 	bus.Subscribe(EventTypeUpdated, handler2)
 
-	bus.Publish(context.Background(), eventbus.NewEvent(
-		EventTypeCreated,
-		eventCreated{"Foo eventCreated"},
-	))
+	bus.Publish(context.Background(), eventCreated{"Foo eventCreated"})
 
+	//
 	var events = eventbus.Events{}
 
-	events.Enqueue(eventbus.NewEvent(
-		EventTypeCreated,
-		eventCreated{"Foo eventCreated12"},
-		eventbus.WithIsAsync(true),
-	))
-	events.Enqueue(eventbus.NewEvent(
-		EventTypeUpdated,
-		eventUpdated{"Foo eventUpdated122"},
-	))
+	events.Enqueue(eventCreated{"Foo eventCreated12"})
+	events.Enqueue(eventUpdated{"Foo eventUpdated122"})
+	bus.Flush(context.Background(), &events)
 
+	events.Enqueue(eventUpdated{"Foo eventUpdated1223"})
 	bus.Flush(context.Background(), &events)
 
 	time.Sleep(200 * time.Millisecond)
