@@ -33,9 +33,9 @@ func (e *EventBus) Subscribe(name EventName, handler Handler, options ...Handler
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	withHandlerOption := newHandlerOption(handler)
+	handlerWithOption := newHandlerOption(handler)
 	for _, option := range options {
-		option(withHandlerOption)
+		option(handlerWithOption)
 	}
 
 	handlerID := e.nextID
@@ -44,7 +44,7 @@ func (e *EventBus) Subscribe(name EventName, handler Handler, options ...Handler
 	if e.handlers[name] == nil {
 		e.handlers[name] = make(Handlers)
 	}
-	e.handlers[name][handlerID] = withHandlerOption
+	e.handlers[name][handlerID] = handlerWithOption
 
 	return handlerID, func() {
 		e.Unsubscribe(name, handlerID)
