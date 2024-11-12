@@ -17,22 +17,28 @@ func (h HandlerFunc) Handle(ctx context.Context, event Event) {
 	h(ctx, event)
 }
 
-func WithHandlerIsAsync(s bool) HandlerOption {
+func WithHandlerIsAsync(v bool) HandlerOption {
 	return func(o *handlerOption) {
-		o.isAsync = s
+		o.isAsync = v
 	}
 }
 
 type handlerOption struct {
-	isAsync bool
 	next    Handler
+	isAsync bool
 }
 
-func newHandlerOption(next Handler) *handlerOption {
-	return &handlerOption{
-		isAsync: false,
+func newHandlerOption(next Handler, options []HandlerOption) Handler {
+	handler := &handlerOption{
 		next:    next,
+		isAsync: false,
 	}
+
+	for _, option := range options {
+		option(handler)
+	}
+
+	return handler
 }
 
 func (o handlerOption) Handle(ctx context.Context, event Event) {
