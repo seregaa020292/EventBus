@@ -17,14 +17,14 @@ type (
 )
 
 type EventBus struct {
-	handlers map[EventName]Handlers
+	handlers map[EventName]handlerOptions
 	nextID   HandlerID
 	mu       sync.RWMutex
 }
 
 func New() *EventBus {
 	return &EventBus{
-		handlers: make(map[EventName]Handlers),
+		handlers: make(map[EventName]handlerOptions),
 		nextID:   1,
 	}
 }
@@ -37,7 +37,7 @@ func (e *EventBus) Subscribe(name EventName, handler Handler, options ...Handler
 	e.nextID++
 
 	if e.handlers[name] == nil {
-		e.handlers[name] = make(Handlers)
+		e.handlers[name] = make(handlerOptions)
 	}
 	e.handlers[name][handlerID] = newHandlerOption(handler, options)
 
@@ -78,11 +78,10 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	}
 
 	for _, handler := range handlers {
-		h := handler.(*handlerOption)
-		if h.isAsync {
-			go h.Handle(ctx, event)
+		if handler.isAsync {
+			go handler.Handle(ctx, event)
 		} else {
-			h.Handle(ctx, event)
+			handler.Handle(ctx, event)
 		}
 	}
 }

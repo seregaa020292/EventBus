@@ -4,7 +4,6 @@ import "context"
 
 type (
 	HandlerID = uint16
-	Handlers  = map[HandlerID]Handler
 	Handler   interface {
 		Handle(ctx context.Context, event Event)
 	}
@@ -23,12 +22,15 @@ func WithHandlerIsAsync(v bool) HandlerOption {
 	}
 }
 
-type handlerOption struct {
-	next    Handler
-	isAsync bool
-}
+type (
+	handlerOptions = map[HandlerID]*handlerOption
+	handlerOption  struct {
+		next    Handler
+		isAsync bool
+	}
+)
 
-func newHandlerOption(next Handler, options []HandlerOption) Handler {
+func newHandlerOption(next Handler, options []HandlerOption) *handlerOption {
 	handler := &handlerOption{
 		next:    next,
 		isAsync: false,
