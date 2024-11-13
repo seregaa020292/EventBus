@@ -55,6 +55,6 @@ func main() {
 	events.Enqueue(eventUpdated{"Foo eventUpdated1223"})
 	bus.Flush(context.Background(), &events)
 
-	time.Sleep(200 * time.Millisecond)
+	bus.Wait()
 }
 ```

@@ -9,6 +9,7 @@ type (
 	Publisher interface {
 		Publish(ctx context.Context, event Event)
 		Flush(ctx context.Context, events *Events)
+		Wait()
 	}
 	Subscriber interface {
 		Subscribe(name EventName, handler Handler, options ...HandlerOption) (HandlerID, func())
@@ -20,6 +21,7 @@ type EventBus struct {
 	handlers map[EventName]handlerOptions
 	nextID   HandlerID
 	mu       sync.RWMutex
+	wg       sync.WaitGroup
 }
 
 func New() *EventBus {
@@ -39,7 +41,7 @@ func (e *EventBus) Subscribe(name EventName, handler Handler, options ...Handler
 	if e.handlers[name] == nil {
 		e.handlers[name] = make(handlerOptions)
 	}
-	e.handlers[name][handlerID] = newHandlerOption(handler, options)
+	e.handlers[name][handlerID] = newHandlerOption(handler, &e.wg, options)
 
 	return handlerID, func() {
 		e.Unsubscribe(name, handlerID)
@@ -78,10 +80,10 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	}
 
 	for _, handler := range handlers {
-		if handler.isAsync {
-			go handler.Handle(ctx, event)
-		} else {
-			handler.Handle(ctx, event)
-		}
+		handler.Handle(ctx, event)
 	}
+}
+
+func (e *EventBus) Wait() {
+	e.wg.Wait()
 }
