@@ -16,31 +16,31 @@
 package main
 
 import (
-    "context"
+	"context"
 
-    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+	"sanbox/eventbus"
 )
 
 type UserCreatedEvent struct{}
 
 func (e UserCreatedEvent) Topic() string {
-    return "user.created"
+	return "user.created"
 }
 
 func main() {
-    bus := eventbus.New()
+	bus := eventbus.New()
 
-    // Подписка на событие
-    id, _ := bus.Subscribe("user.created", eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
-        // Обработка события
-        return nil
-    }), eventbus.WithAsync())
+	// Подписка на событие
+	id, _ := bus.Subscribe("user.created", eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
+		// Обработка события
+		return nil
+	}), eventbus.WithAsync())
 
-    // Публикация события
-    bus.Publish(context.Background(), &UserCreatedEvent{})
+	// Публикация события
+	bus.Publish(context.Background(), &UserCreatedEvent{})
 
-    bus.Wait()
-    bus.Unsubscribe("user.created", id)
+	bus.Wait()
+	bus.Unsubscribe("user.created", id)
 }
 
 ```
@@ -51,20 +51,20 @@ func main() {
 package main
 
 import (
-    "time"
+	"time"
 
-    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+	"sanbox/eventbus"
 )
 
 func main() {
-    bus := eventbus.New(
-        // Таймаут для асинхронных обработчиков
-        eventbus.WithAsyncTimeout(30*time.Second),
-        // Кастомный обработчик ошибок
-        eventbus.WithErrorHandler(func(err error) {
-            // Кастомная обработка ошибок
-        }),
-    )
+	bus := eventbus.New(
+		// Таймаут для асинхронных обработчиков
+		eventbus.WithAsyncTimeout(30*time.Second),
+		// Кастомный обработчик ошибок
+		eventbus.WithErrorHandler(func(err error) {
+			// Кастомная обработка ошибок
+		}),
+	)
 }
 
 ```
@@ -75,22 +75,22 @@ func main() {
 package main
 
 import (
-    "context"
-    "log"
+	"context"
+	"log"
 
-    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+	"sanbox/eventbus"
 )
 
 func main() {
-    bus := eventbus.New()
+	bus := eventbus.New()
 
-    // Пример middleware для логирования
-    bus.Use(func(next eventbus.Handler) eventbus.Handler {
-        return eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
-            log.Printf("Обработка события: %s", e.Topic())
-            return next.Handle(ctx, e)
-        })
-    })
+	// Пример middleware для логирования
+	bus.Use(func(next eventbus.Handler) eventbus.Handler {
+		return eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
+			log.Printf("Обработка события: %s", e.Topic())
+			return next.Handle(ctx, e)
+		})
+	})
 }
 
 // Порядок выполнения:
@@ -107,21 +107,22 @@ func main() {
 package main
 
 import (
-    "context"
+	"context"
 
-    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+	"sanbox/eventbus"
 )
 
 func main() {
-    bus := eventbus.New()
+	bus := eventbus.New()
 
-    queue := &eventbus.EventQueue{}
+	queue := &eventbus.EventQueue{}
 
-    // Накопление событий
-    queue.Enqueue(event1)
-    queue.Enqueue(event2)
+	// Накопление событий
+	queue.Enqueue(event1)
+	queue.Enqueue(event2)
 
-    // Пакетная публикация
-    bus.Flush(context.Background(), queue)
+	// Пакетная публикация
+	bus.Flush(context.Background(), queue)
 }
+
 ```
