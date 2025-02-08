@@ -30,7 +30,7 @@ func New(opts ...Option) *EventBus {
 	return &EventBus{
 		config:     newConfig(opts...),
 		handlers:   make(map[string]map[string]*handler),
-		middleware: chainMiddlewares{middlewares: make([]Middleware, 0)},
+		middleware: middleware{middlewares: make([]Middleware, 0)},
 	}
 }
 
