@@ -5,64 +5,53 @@ import (
 	"sync"
 )
 
-type (
-	HandlerID = uint16
-	Handler   interface {
-		Handle(ctx context.Context, event Event)
-	}
-	HandlerOption func(*handlerOption)
-)
+type HandlerID = uint64
 
-type HandlerFunc func(ctx context.Context, event Event)
-
-func (h HandlerFunc) Handle(ctx context.Context, event Event) {
-	h(ctx, event)
+type Handler interface {
+	Handle(ctx context.Context, event Event) error
 }
 
-func WithHandlerIsAsync(v bool) HandlerOption {
-	return func(o *handlerOption) {
-		o.isAsync = v
+type HandlerFunc func(ctx context.Context, event Event) error
+
+func (f HandlerFunc) Handle(ctx context.Context, event Event) error {
+	return f(ctx, event)
+}
+
+type ErrHandler func(error)
+
+type handler struct {
+	async bool
+	base  Handler
+}
+
+type HandlerOption func(*handler)
+
+func WithHandlerAsync() HandlerOption {
+	return func(h *handler) {
+		h.async = true
 	}
 }
 
-type (
-	handlerOptions = map[HandlerID]*handlerOption
-	handlerOption  struct {
-		next    Handler
-		wg      *sync.WaitGroup
-		isAsync bool
-	}
-)
+type Middleware func(next Handler) Handler
 
-func newHandlerOption(next Handler, wg *sync.WaitGroup, options []HandlerOption) *handlerOption {
-	handler := &handlerOption{
-		next:    next,
-		wg:      wg,
-		isAsync: false,
-	}
-
-	for _, option := range options {
-		option(handler)
-	}
-
-	return handler
+type chainMiddlewares struct {
+	middlewares []Middleware
+	mu          sync.RWMutex
 }
 
-func (h handlerOption) Handle(ctx context.Context, event Event) {
-	if h.isAsync {
-		h.asyncHandle(ctx, event)
-		return
-	}
-
-	h.next.Handle(ctx, event)
+func (m *chainMiddlewares) Append(mw ...Middleware) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.middlewares = append(m.middlewares, mw...)
 }
 
-func (h handlerOption) asyncHandle(ctx context.Context, event Event) {
-	h.wg.Add(1)
+func (m *chainMiddlewares) Wrap(h Handler) Handler {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
-	go func() {
-		defer h.wg.Done()
-
-		h.next.Handle(ctx, event)
-	}()
+	next := h
+	for i := len(m.middlewares) - 1; i >= 0; i-- {
+		next = m.middlewares[i](next)
+	}
+	return next
 }

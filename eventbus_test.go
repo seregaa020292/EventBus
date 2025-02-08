@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"sanbox/eventbus"
+	"ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
 )
 
 type testHandler struct {
@@ -15,16 +15,17 @@ type testHandler struct {
 	mu    sync.Mutex
 }
 
-func (h *testHandler) Handle(ctx context.Context, event eventbus.Event) {
+func (h *testHandler) Handle(ctx context.Context, event eventbus.Event) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	h.calls = append(h.calls, event)
+	return nil
 }
 
 type testEvent string
 
-func (e testEvent) Name() eventbus.EventName { return 1 }
+func (e testEvent) Topic() string { return "test.event" }
 
 func TestEventBus(t *testing.T) {
 	bus := eventbus.New()
@@ -35,7 +36,7 @@ func TestEventBus(t *testing.T) {
 
 	// Подписываемся на событие
 	event := testEvent("test payload")
-	_, unsubscribe := bus.Subscribe(event.Name(), handler)
+	_, unsubscribe := bus.Subscribe(event.Topic(), handler)
 
 	// Публикуем событие
 	bus.Publish(ctx, event)
@@ -61,10 +62,10 @@ func TestFlush(t *testing.T) {
 
 	// Подписываемся на событие
 	event := testEvent("test payload")
-	bus.Subscribe(event.Name(), handler)
+	bus.Subscribe(event.Topic(), handler)
 
 	// Добавляем события в очередь
-	events := &eventbus.Events{}
+	events := &eventbus.EventQueue{}
 	events.Enqueue(event)
 	events.Enqueue(event)
 
@@ -86,7 +87,7 @@ func TestAsyncPublish(t *testing.T) {
 
 	// Подписываемся на событие
 	event := testEvent("async payload")
-	bus.Subscribe(event.Name(), handler, eventbus.WithHandlerIsAsync(true))
+	bus.Subscribe(event.Topic(), handler, eventbus.WithHandlerAsync())
 
 	// Публикуем асинхронное событие
 	bus.Publish(ctx, event)
@@ -108,13 +109,13 @@ func TestUnsubscribe(t *testing.T) {
 
 	// Подписываемся на событие
 	event := testEvent("payload unsubscribe")
-	handlerID, unsubscribe := bus.Subscribe(event.Name(), handler)
+	handlerID, unsubscribe := bus.Subscribe(event.Topic(), handler)
 
 	// Публикуем событие
 	bus.Publish(ctx, event)
 
 	// Убедимся, что обработчик был вызван
-	assert.Equal(t, uint16(1), handlerID)
+	assert.Equal(t, uint64(0), handlerID)
 	assert.Len(t, handler.calls, 1)
 
 	// Отписываемся

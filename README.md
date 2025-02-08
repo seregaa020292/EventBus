@@ -1,60 +1,127 @@
-## Usage
+# EventBus
+
+Шина событий на с поддержкой middleware и асинхронной обработкой.
+
+## Особенности
+
+- 🚀 Асинхронная обработка событий
+- 🛠️ Поддержка цепочек middleware
+- 📦 Гибкая конфигурация
+- 🛡️ Обработка ошибок
+- 🕒 Таймауты для асинхронных операций
+
+## Быстрый старт
 
 ```go
 package main
 
-const (
-	EventTypeCreated eventbus.EventName = iota
-	EventTypeUpdated
+import (
+    "context"
+
+    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
 )
 
-type ListenHandle1 struct {
-	V int
-}
+type UserCreatedEvent struct{}
 
-func (h ListenHandle1) Handle(ctx context.Context, event eventbus.Event) {
-	fmt.Printf("eventbus handler1 event: %+v, %d\n", event, h.V)
-	//fmt.Printf("eventbus handler1 event: %+v\n", event.(eventCreated))
+func (e UserCreatedEvent) Topic() string {
+    return "user.created"
 }
 
 func main() {
-	bus := eventbus.New()
+    bus := eventbus.New()
 
-	listenHandle1 := ListenHandle1{1}
-	listenHandle2 := ListenHandle1{2}
+    // Подписка на событие
+    id, _ := bus.Subscribe("user.created", eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
+        // Обработка события
+        return nil
+    }), eventbus.WithAsync())
 
-	{
-		_, unsubscribe := bus.Subscribe(EventTypeCreated, listenHandle1)
-		unsubscribe()
-	}
-	{
-		handlerID, _ := bus.Subscribe(EventTypeCreated, listenHandle2)
-		bus.Unsubscribe(EventTypeCreated, handlerID)
-	}
+    // Публикация события
+    bus.Publish(context.Background(), &UserCreatedEvent{})
 
-	handler2 := eventbus.HandlerFunc(func(ctx context.Context, event eventbus.Event) {
-		switch e := event.(type) {
-		case eventCreated:
-			fmt.Printf("eventbus handler2 event: %+v, %v\n", e, e.ID)
-		case eventUpdated:
-			fmt.Printf("eventbus handler2 event: %+v, %v\n", e, e.ID)
-		}
-	})
-	bus.Subscribe(EventTypeCreated, handler2, eventbus.WithHandlerIsAsync(true))
-	bus.Subscribe(EventTypeUpdated, handler2)
+    bus.Wait()
+    bus.Unsubscribe("user.created", id)
+}
 
-	bus.Publish(context.Background(), eventCreated{"Foo eventCreated"})
+```
 
-	//
-	var events = eventbus.Events{}
+## Конфигурация
 
-	events.Enqueue(eventCreated{"Foo eventCreated12"})
-	events.Enqueue(eventUpdated{"Foo eventUpdated122"})
-	bus.Flush(context.Background(), &events)
+```go
+package main
 
-	events.Enqueue(eventUpdated{"Foo eventUpdated1223"})
-	bus.Flush(context.Background(), &events)
+import (
+    "time"
 
-	bus.Wait()
+    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+)
+
+func main() {
+    bus := eventbus.New(
+        // Таймаут для асинхронных обработчиков
+        eventbus.WithAsyncTimeout(30*time.Second),
+        // Кастомный обработчик ошибок
+        eventbus.WithErrorHandler(func(err error) {
+            // Кастомная обработка ошибок
+        }),
+    )
+}
+
+```
+
+## Middleware
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+
+    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+)
+
+func main() {
+    bus := eventbus.New()
+
+    // Пример middleware для логирования
+    bus.Use(func(next eventbus.Handler) eventbus.Handler {
+        return eventbus.HandlerFunc(func(ctx context.Context, e eventbus.Event) error {
+            log.Printf("Обработка события: %s", e.Topic())
+            return next.Handle(ctx, e)
+        })
+    })
+}
+
+// Порядок выполнения:
+// 1. Первый зарег. middleware
+// 2. Второй зарег. middleware
+// 3. ...
+// 4. Основной обработчик
+
+```
+
+## Очередь событий
+
+```go
+package main
+
+import (
+    "context"
+
+    "ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+)
+
+func main() {
+    bus := eventbus.New()
+
+    queue := &eventbus.EventQueue{}
+
+    // Накопление событий
+    queue.Enqueue(event1)
+    queue.Enqueue(event2)
+
+    // Пакетная публикация
+    bus.Flush(context.Background(), queue)
 }
 ```
