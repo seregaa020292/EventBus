@@ -26,3 +26,9 @@ func WithHandlerAsync() HandlerOption {
 		h.async = true
 	}
 }
+
+func generateID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)
+}
