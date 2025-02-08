@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"ppr.gitlab.yandexcloud.net/ecosystem/fines/service/pkg/eventbus"
+	"sanbox/eventbus"
 )
 
 type testHandler struct {
