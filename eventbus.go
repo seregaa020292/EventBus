@@ -2,7 +2,9 @@ package eventbus
 
 import (
 	"context"
+	"rand"
 	"sync"
+	"fmt"
 )
 
 type Publisher interface {
@@ -12,15 +14,14 @@ type Publisher interface {
 }
 
 type Subscriber interface {
-	Subscribe(topic string, handler Handler, options ...HandlerOption) (HandlerID, func())
-	Unsubscribe(topic string, id HandlerID)
+	Subscribe(topic string, handler Handler, options ...HandlerOption) (string, func())
+	Unsubscribe(topic string, id string)
 }
 
 type EventBus struct {
 	config     Config
-	handlers   map[string]map[HandlerID]*handler
+	handlers   map[string]map[string]*handler
 	middleware chainMiddlewares
-	nextID     HandlerID
 	mu         sync.RWMutex
 	wg         sync.WaitGroup
 }
@@ -28,34 +29,33 @@ type EventBus struct {
 func New(opts ...Option) *EventBus {
 	return &EventBus{
 		config:     newConfig(opts...),
-		handlers:   make(map[string]map[HandlerID]*handler),
+		handlers:   make(map[string]map[string]*handler),
 		middleware: chainMiddlewares{middlewares: make([]Middleware, 0)},
 	}
 }
 
-func (e *EventBus) Subscribe(topic string, h Handler, opts ...HandlerOption) (HandlerID, func()) {
-	e.mu.Lock()
-	defer e.mu.Unlock()
+func (e *EventBus) Subscribe(topic string, h Handler, opts ...HandlerOption) (string, func()) {
+	id := generateID()
 
-	id := e.nextID
-	e.nextID++
-
-	wrapHandler := &handler{
+	sub := &handler{
 		base: h,
 	}
 	for _, opt := range opts {
-		opt(wrapHandler)
+		opt(sub)
 	}
 
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
 	if e.handlers[topic] == nil {
-		e.handlers[topic] = make(map[HandlerID]*handler)
+		e.handlers[topic] = make(map[string]*handler)
 	}
-	e.handlers[topic][id] = wrapHandler
+	e.handlers[topic][id] = sub
 
 	return id, func() { e.Unsubscribe(topic, id) }
 }
 
-func (e *EventBus) Unsubscribe(topic string, id HandlerID) {
+func (e *EventBus) Unsubscribe(topic string, id string) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
@@ -111,4 +111,10 @@ func (e *EventBus) Use(middleware ...Middleware) {
 
 func (e *EventBus) Wait() {
 	e.wg.Wait()
+}
+
+func generateID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%x", b)
 }
