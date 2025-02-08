@@ -35,14 +35,14 @@ func New(opts ...Option) *EventBus {
 }
 
 func (e *EventBus) Subscribe(topic string, h Handler, opts ...HandlerOption) (string, func()) {
-	id := generateID()
-
 	sub := &handler{
 		base: h,
 	}
 	for _, opt := range opts {
 		opt(sub)
 	}
+
+	id := generateID()
 
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -77,25 +77,13 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	e.mu.RUnlock()
 
 	for _, h := range handlers {
-		if !h.async {
-			next := e.middleware.Wrap(h.base)
-			if err := next.Handle(ctx, event); err != nil {
-				e.config.ErrorHandler(err)
-			}
+		if h.async {
+			e.wg.Add(1)
+			go e.handleAsync(ctx, event, h.base)
 			continue
 		}
 
-		e.wg.Add(1)
-		go func() {
-			defer e.wg.Done()
-			ctx, cancel := context.WithTimeout(context.Background(), e.config.AsyncTimeout)
-			defer cancel()
-
-			next := e.middleware.Wrap(h.base)
-			if err := next.Handle(ctx, event); err != nil {
-				e.config.ErrorHandler(err)
-			}
-		}()
+		e.handleSync(ctx, event)
 	}
 }
 
@@ -113,8 +101,23 @@ func (e *EventBus) Wait() {
 	e.wg.Wait()
 }
 
-func generateID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
-	return fmt.Sprintf("%x", b)
+func (e *EventBus) handleAsync(ctx context.Context, event Event, h Handler) {
+	defer e.wg.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), e.config.AsyncTimeout)
+	defer cancel()
+
+	defer func() {
+		if r := recover(); r != nil {
+			e.config.ErrorHandler(r)
+		}
+	}()
+
+	e.handleSync(ctx, event, h)
+}
+
+func (e *EventBus) handleSync(ctx context.Context, event Event, h Handler) {
+	next := e.middleware.Wrap(h)
+	if err := next.Handle(ctx, event); err != nil {
+		e.config.ErrorHandler(err)
+	}
 }
