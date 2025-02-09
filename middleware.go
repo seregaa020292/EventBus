@@ -8,11 +8,11 @@ type middleware struct {
 	middlewares []Middleware
 }
 
-func (m *chainMiddlewares) Append(mw ...Middleware) {
+func (m *middleware) Append(mw ...Middleware) {
 	m.middlewares = append(m.middlewares, mw...)
 }
 
-func (m *chainMiddlewares) Wrap(h Handler) Handler {
+func (m *middleware) Wrap(h Handler) Handler {
 	for i := len(m.middlewares) - 1; i >= 0; i-- {
 		h = m.middlewares[i](h)
 	}
