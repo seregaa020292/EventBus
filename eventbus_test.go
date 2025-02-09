@@ -109,13 +109,12 @@ func TestUnsubscribe(t *testing.T) {
 
 	// Подписываемся на событие
 	event := testEvent("payload unsubscribe")
-	handlerID, unsubscribe := bus.Subscribe(event.Topic(), handler)
+	_, unsubscribe := bus.Subscribe(event.Topic(), handler)
 
 	// Публикуем событие
 	bus.Publish(ctx, event)
 
 	// Убедимся, что обработчик был вызван
-	assert.Equal(t, uint64(0), handlerID)
 	assert.Len(t, handler.calls, 1)
 
 	// Отписываемся

@@ -1,6 +1,10 @@
 package eventbus
 
-import "context"
+import (
+	"context"
+	"crypto/rand"
+	"fmt"
+)
 
 type Handler interface {
 	Handle(ctx context.Context, event Event) error

@@ -2,9 +2,10 @@ package eventbus
 
 import (
 	"context"
-	"rand"
+	"maps"
 	"sync"
-	"fmt"
+
+	"github.com/pkg/errors"
 )
 
 type Publisher interface {
@@ -75,7 +76,7 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 	e.mu.RLock()
 	handlers := e.handlers[event.Topic()]
 	handlersCopy := make(map[string]*handler, len(handlers))
-    	copy(handlersCopy, handlers)
+	maps.Copy(handlersCopy, handlers)
 	e.mu.RUnlock()
 
 	for _, h := range handlersCopy {
@@ -85,7 +86,7 @@ func (e *EventBus) Publish(ctx context.Context, event Event) {
 			continue
 		}
 
-		e.handleSync(ctx, event)
+		e.handleSync(ctx, event, h.base)
 	}
 }
 
