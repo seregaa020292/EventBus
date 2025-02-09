@@ -74,9 +74,11 @@ func (e *EventBus) Unsubscribe(topic string, id string) {
 func (e *EventBus) Publish(ctx context.Context, event Event) {
 	e.mu.RLock()
 	handlers := e.handlers[event.Topic()]
+	handlersCopy := make(map[string]*handler, len(handlers))
+    	copy(handlersCopy, handlers)
 	e.mu.RUnlock()
 
-	for _, h := range handlers {
+	for _, h := range handlersCopy {
 		if h.async {
 			e.wg.Add(1)
 			go e.handleAsync(ctx, event, h.base)
@@ -108,7 +110,7 @@ func (e *EventBus) handleAsync(ctx context.Context, event Event, h Handler) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			e.config.ErrorHandler(r)
+			e.config.ErrorHandler(errors.Errorf("panic recovered: %v", r))
 		}
 	}()
 
