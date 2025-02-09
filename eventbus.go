@@ -105,7 +105,7 @@ func (e *EventBus) Wait() {
 
 func (e *EventBus) handleAsync(ctx context.Context, event Event, h Handler) {
 	defer e.wg.Done()
-	ctx, cancel := context.WithTimeout(context.Background(), e.config.AsyncTimeout)
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.config.AsyncTimeout)
 	defer cancel()
 
 	defer func() {
