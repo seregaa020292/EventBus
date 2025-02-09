@@ -21,7 +21,7 @@ type Subscriber interface {
 type EventBus struct {
 	config     Config
 	handlers   map[string]map[string]*handler
-	middleware chainMiddlewares
+	middleware middleware
 	mu         sync.RWMutex
 	wg         sync.WaitGroup
 }
@@ -105,8 +105,14 @@ func (e *EventBus) Wait() {
 
 func (e *EventBus) handleAsync(ctx context.Context, event Event, h Handler) {
 	defer e.wg.Done()
-	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), e.config.AsyncTimeout)
-	defer cancel()
+
+	ctx = context.WithoutCancel(ctx)
+
+	if e.config.AsyncTimeout != 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, e.config.AsyncTimeout)
+		defer cancel()
+	}
 
 	defer func() {
 		if r := recover(); r != nil {
