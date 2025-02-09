@@ -21,7 +21,7 @@ type Subscriber interface {
 type EventBus struct {
 	config     Config
 	handlers   map[string]map[string]*handler
-	middleware middleware
+	middleware middlewares
 	mu         sync.RWMutex
 	wg         sync.WaitGroup
 }
@@ -30,7 +30,7 @@ func New(opts ...Option) *EventBus {
 	return &EventBus{
 		config:     newConfig(opts...),
 		handlers:   make(map[string]map[string]*handler),
-		middleware: middleware{middlewares: make([]Middleware, 0)},
+		middleware: middlewares{chain: make([]Middleware, 0)},
 	}
 }
 
