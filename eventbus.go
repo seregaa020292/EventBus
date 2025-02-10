@@ -75,11 +75,9 @@ func (e *EventBus) Unsubscribe(topic string, id string) {
 func (e *EventBus) Publish(ctx context.Context, event Event) {
 	e.mu.RLock()
 	handlers := e.handlers[event.Topic()]
-	handlersCopy := make(map[string]*handler, len(handlers))
-	maps.Copy(handlersCopy, handlers)
 	e.mu.RUnlock()
 
-	for _, h := range handlersCopy {
+	for _, h := range maps.Clone(handlers) {
 		if h.async {
 			e.wg.Add(1)
 			go e.handleAsync(ctx, event, h.base)
